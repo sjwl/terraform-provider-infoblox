@@ -14,7 +14,13 @@ func hostIPv4Schema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		"address": {
 			Type:     schema.TypeString,
-			Required: true,
+			Computed: true,
+			Optional: true,
+		},
+		"next_available": {
+			Type:          schema.TypeString,
+			Optional:      true,
+			ConflictsWith: []string{"ipv4addr.0.address"},
 		},
 		"configure_for_dhcp": {
 			Type:     schema.TypeBool,
@@ -32,7 +38,13 @@ func hostIPv6Schema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		"address": {
 			Type:     schema.TypeString,
-			Required: true,
+			Computed: true,
+			Optional: true,
+		},
+		"next_available": {
+			Type:          schema.TypeString,
+			Optional:      true,
+			ConflictsWith: []string{"ipv6addr.0.address"},
 		},
 		"configure_for_dhcp": {
 			Type:     schema.TypeBool,
@@ -98,7 +110,13 @@ func ipv4sFromList(ipv4s []interface{}) []infoblox.HostIpv4Addr {
 		ipMap := v.(map[string]interface{})
 		i := infoblox.HostIpv4Addr{}
 
-		i.Ipv4Addr = ipMap["address"].(string)
+		if val, ok := ipMap["address"]; ok {
+			i.Ipv4Addr = val.(string)
+		}
+
+		if val, ok := ipMap["next_available"]; ok {
+			i.Ipv4Addr = "func:nextavailableip:" + val.(string)
+		}
 
 		if val, ok := ipMap["configure_for_dhcp"]; ok {
 			i.ConfigureForDHCP = val.(bool)
@@ -119,8 +137,12 @@ func ipv6sFromList(ipv6s []interface{}) []infoblox.HostIpv6Addr {
 		ipMap := v.(map[string]interface{})
 		i := infoblox.HostIpv6Addr{}
 
-		i.Ipv6Addr = ipMap["address"].(string)
-
+		if val, ok := ipMap["address"]; ok {
+			i.Ipv6Addr = val.(string)
+		}
+		if val, ok := ipMap["next_available"]; ok {
+			i.Ipv6Addr = "func:nextavailableip:" + val.(string)
+		}
 		if val, ok := ipMap["configure_for_dhcp"]; ok {
 			i.ConfigureForDHCP = val.(bool)
 		}
@@ -138,7 +160,7 @@ func hostObjectFromAttributes(d *schema.ResourceData) infoblox.RecordHostObject 
 	if attr, ok := d.GetOk("name"); ok {
 		hostObject.Name = attr.(string)
 	}
-	if attr, ok := d.GetOk("configure_for_dns"); ok {
+	if attr, ok := d.GetOkExists("configure_for_dns"); ok {
 		hostObject.ConfigureForDNS = attr.(bool)
 	}
 	if attr, ok := d.GetOk("comment"); ok {
@@ -215,10 +237,15 @@ func resourceInfobloxHostRecordRead(d *schema.ResourceData, meta interface{}) er
 	if &record.Ipv4Addrs != nil {
 		var result []interface{}
 
-		for _, v := range record.Ipv4Addrs {
+		configIPaddr := d.Get("ipv4addr").([]interface{})
+		for idx, v := range record.Ipv4Addrs {
 			i := make(map[string]interface{})
 
 			i["address"] = v.Ipv4Addr
+
+			if val, ok := (configIPaddr[idx]).(map[string]interface{})["next_available"]; ok {
+				i["next_available"] = val.(string)
+			}
 			if &v.ConfigureForDHCP != nil {
 				i["configure_for_dhcp"] = v.ConfigureForDHCP
 			}
@@ -234,10 +261,15 @@ func resourceInfobloxHostRecordRead(d *schema.ResourceData, meta interface{}) er
 	if &record.Ipv6Addrs != nil {
 		var result []interface{}
 
-		for _, v := range record.Ipv6Addrs {
+		configIPaddr := d.Get("ipv4addr").([]interface{})
+		for idx, v := range record.Ipv6Addrs {
 			i := make(map[string]interface{})
 
 			i["address"] = v.Ipv6Addr
+
+			if val, ok := (configIPaddr[idx]).(map[string]interface{})["next_available"]; ok {
+				i["next_available"] = val.(string)
+			}
 			if &v.ConfigureForDHCP != nil {
 				i["configure_for_dhcp"] = v.ConfigureForDHCP
 			}
